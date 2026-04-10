@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import os from 'node:os';
 
 dotenv.config();
 
@@ -126,6 +127,12 @@ function parseMenuButton(value: string | undefined): AppConfig['telegram']['menu
   throw new Error('TELEGRAM_MENU_BUTTON must be commands, default, none, or web_app');
 }
 
+function expandHome(path: string): string {
+  if (path === '~') return os.homedir();
+  if (path.startsWith('~/')) return `${os.homedir()}/${path.slice(2)}`;
+  return path;
+}
+
 export function loadConfig(): AppConfig {
   const apiKey = optional('OLLAMA_API_KEY');
   const menuButton = parseMenuButton(optional('TELEGRAM_MENU_BUTTON'));
@@ -187,17 +194,17 @@ export function loadConfig(): AppConfig {
       command: optional('CODEX_COMMAND') ?? 'codex-proxy',
       model: optional('CODEX_MODEL') ?? 'gpt-5.3-codex',
       reasoning: parseCodexReasoning(optional('CODEX_REASONING')),
-      workspace: optional('CODEX_WORKSPACE') ?? '~/web/my-local-bro-workspace',
+      workspace: expandHome(optional('CODEX_WORKSPACE') ?? '~/web/my-local-bro-workspace'),
       timeoutMs: numberEnv('CODEX_TIMEOUT_MS', 20 * 60 * 1000),
       shell: optional('CODEX_SHELL') ?? '/bin/zsh',
       sourceZshrc: boolEnv('CODEX_SOURCE_ZSHRC', true),
     },
     runtime: {
-      settingsPath: optional('RUNTIME_SETTINGS_PATH') ?? 'data/settings.json',
+      settingsPath: expandHome(optional('RUNTIME_SETTINGS_PATH') ?? 'data/settings.json'),
     },
     ytDownload: {
-      scriptPath: optional('YT_DOWNLOAD_SCRIPT') ?? '~/Movies/ShortsToProcess/video-dl.sh',
-      dbPath: optional('YT_DOWNLOAD_DB_PATH') ?? '~/Movies/ShortsToProcess/shorts.sqlite3',
+      scriptPath: expandHome(optional('YT_DOWNLOAD_SCRIPT') ?? '~/Movies/ShortsToProcess/video-dl.sh'),
+      dbPath: expandHome(optional('YT_DOWNLOAD_DB_PATH') ?? '~/Movies/ShortsToProcess/shorts.sqlite3'),
     },
     linkIngest: {
       enabled: boolEnv('LINK_INGEST_ENABLED', true),
