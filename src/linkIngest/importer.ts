@@ -6,7 +6,13 @@ import type { TelegramClient } from '../telegram/client.js';
 import { truncateText } from '../util/text.js';
 import { findExistingMediaRecords } from './db.js';
 import { normalizeLink, normalizeUrl, type NormalizedLink } from './normalize.js';
-import type { BatchImportSummary, IngestBatchJob } from './types.js';
+import type { BatchImportSummary, IngestBatchJob, IngestBatchRequest, PrecheckSummary } from './types.js';
+
+interface PreparedBatch {
+  normalized: NormalizedLink[];
+  queued: NormalizedLink[];
+  duplicatesSkipped: number;
+}
 
 export class LinkBatchImporter {
   private activeAbort: AbortController | undefined;
@@ -23,32 +29,27 @@ export class LinkBatchImporter {
     return true;
   }
 
+  async precheckBatch(batch: IngestBatchRequest): Promise<PrecheckSummary> {
+    const prepared = await this.prepareBatch(batch.links);
+    return {
+      source: batch.source,
+      totalReceived: batch.links.length,
+      uniqueLinks: prepared.normalized.length,
+      duplicatesSkipped: prepared.duplicatesSkipped,
+      willDownload: prepared.queued.length,
+    };
+  }
+
   async runBatch(job: IngestBatchJob): Promise<void> {
     const abort = new AbortController();
     this.activeAbort = abort;
-    const normalized = dedupeLinks(job.links.map(normalizeLink));
-    const existing = await findExistingMediaRecords(
-      this.config.ytDownload.dbPath,
-      normalized.map((item) => item.externalId).filter((value): value is string => Boolean(value)),
-      normalized.map((item) => item.normalizedUrl),
-    );
-    const existingKeys = new Set(
-      existing
-        .filter((row) => existsSync(row.originalPath))
-        .flatMap((row) => {
-          const keys = [safeNormalizeUrl(row.sourceUrl)];
-          if (row.mediaId) keys.push(`id:${row.mediaId}`);
-          return keys;
-        }),
-    );
-
-    const queued = normalized.filter((item) => !isExisting(existingKeys, item));
+    const prepared = await this.prepareBatch(job.links);
     const summary: BatchImportSummary = {
       batchId: job.batchId,
       source: job.source,
       totalReceived: job.links.length,
-      uniqueLinks: normalized.length,
-      duplicatesSkipped: job.links.length - normalized.length + (normalized.length - queued.length),
+      uniqueLinks: prepared.normalized.length,
+      duplicatesSkipped: prepared.duplicatesSkipped,
       downloaded: 0,
       failed: 0,
       cancelled: false,
@@ -60,12 +61,12 @@ export class LinkBatchImporter {
       totalReceived: summary.totalReceived,
       uniqueLinks: summary.uniqueLinks,
       duplicatesSkipped: summary.duplicatesSkipped,
-      willProcess: queued.length,
+      willProcess: prepared.queued.length,
     });
 
-    await this.notifyAll(this.startMessage(summary, queued.length));
+    await this.notifyAll(this.startMessage(summary, prepared.queued.length));
     try {
-      for (const item of queued) {
+      for (const item of prepared.queued) {
         throwIfAborted(abort.signal);
         this.logger.info('🔎', `Batch download ${job.batchId}: ${item.normalizedUrl}`);
         try {
@@ -95,6 +96,30 @@ export class LinkBatchImporter {
     } finally {
       if (this.activeAbort === abort) this.activeAbort = undefined;
     }
+  }
+
+  private async prepareBatch(links: IngestBatchRequest['links']): Promise<PreparedBatch> {
+    const normalized = dedupeLinks(links.map(normalizeLink));
+    const existing = await findExistingMediaRecords(
+      this.config.ytDownload.dbPath,
+      normalized.map((item) => item.externalId).filter((value): value is string => Boolean(value)),
+      normalized.map((item) => item.normalizedUrl),
+    );
+    const existingKeys = new Set(
+      existing
+        .filter((row) => existsSync(row.originalPath))
+        .flatMap((row) => {
+          const keys = [safeNormalizeUrl(row.sourceUrl)];
+          if (row.mediaId) keys.push(`id:${row.mediaId}`);
+          return keys;
+        }),
+    );
+    const queued = normalized.filter((item) => !isExisting(existingKeys, item));
+    return {
+      normalized,
+      queued,
+      duplicatesSkipped: links.length - normalized.length + (normalized.length - queued.length),
+    };
   }
 
   private startMessage(summary: BatchImportSummary, willProcess: number): string {

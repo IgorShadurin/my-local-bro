@@ -6,13 +6,19 @@ import type { AsyncQueue } from '../queue.js';
 import { parseShortsCategory } from '../downloader/shortsToProcess.js';
 import type { QueuedTask } from '../webhook/subscriber.js';
 import type { LinkBatchImporter } from './importer.js';
-import type { IngestBatchJob, IngestBatchRequest, IngestLinkItem } from './types.js';
+import type { IngestBatchJob, IngestBatchRequest, IngestLinkItem, PrecheckSummary } from './types.js';
 
 interface LinkIngestResponse {
   ok: boolean;
   batchId?: string;
   received?: number;
   queued?: number;
+  error?: string;
+}
+
+interface LinkIngestPrecheckResponse {
+  ok: boolean;
+  summary?: PrecheckSummary;
   error?: string;
 }
 
@@ -65,38 +71,46 @@ export class LinkIngestServer {
       this.writeJson(res, 200, { ok: true });
       return;
     }
-    if (req.method !== 'POST' || url.pathname !== '/api/link-batches') {
-      this.writeJson(res, 404, { ok: false, error: 'Not found' });
-      return;
-    }
     if (!this.isAuthorized(req)) {
       this.writeJson(res, 401, { ok: false, error: 'Unauthorized' });
       return;
     }
 
-    const payload = validateBatchRequest(await readJsonBody(req));
-    const batchId = randomUUID();
-    const job: IngestBatchJob = {
-      ...payload,
-      batchId,
-      receivedAt: new Date().toISOString(),
-    };
-    this.queue.enqueue({
-      source: 'link_ingest',
-      run: () => this.importer.runBatch(job),
-    });
-    this.logger.info('📨', 'Link ingest batch queued', {
-      batchId,
-      source: job.source,
-      received: job.links.length,
-      category: job.category,
-    });
-    this.writeJson(res, 202, {
-      ok: true,
-      batchId,
-      received: job.links.length,
-      queued: job.links.length,
-    });
+    if (req.method === 'POST' && url.pathname === '/api/link-batches/precheck') {
+      const payload = validateBatchRequest(await readJsonBody(req));
+      const summary = await this.importer.precheckBatch(payload);
+      this.writeJson(res, 200, { ok: true, summary });
+      return;
+    }
+
+    if (req.method === 'POST' && (url.pathname === '/api/link-batches/import' || url.pathname === '/api/link-batches')) {
+      const payload = validateBatchRequest(await readJsonBody(req));
+      const batchId = randomUUID();
+      const job: IngestBatchJob = {
+        ...payload,
+        batchId,
+        receivedAt: new Date().toISOString(),
+      };
+      this.queue.enqueue({
+        source: 'link_ingest',
+        run: () => this.importer.runBatch(job),
+      });
+      this.logger.info('📨', 'Link ingest batch queued', {
+        batchId,
+        source: job.source,
+        received: job.links.length,
+        category: job.category,
+      });
+      this.writeJson(res, 202, {
+        ok: true,
+        batchId,
+        received: job.links.length,
+        queued: job.links.length,
+      });
+      return;
+    }
+
+    this.writeJson(res, 404, { ok: false, error: 'Not found' });
   }
 
   private isAuthorized(req: IncomingMessage): boolean {
@@ -110,7 +124,11 @@ export class LinkIngestServer {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   }
 
-  private writeJson(res: ServerResponse, statusCode: number, payload: LinkIngestResponse | { ok: true }): void {
+  private writeJson(
+    res: ServerResponse,
+    statusCode: number,
+    payload: LinkIngestResponse | LinkIngestPrecheckResponse | { ok: true },
+  ): void {
     res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(payload));
   }
@@ -118,11 +136,14 @@ export class LinkIngestServer {
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
+  let total = 0;
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    if (chunks.reduce((sum, part) => sum + part.length, 0) > 1024 * 1024) {
+    const part = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += part.length;
+    if (total > 1024 * 1024) {
       throw new Error('Request body too large');
     }
+    chunks.push(part);
   }
   const body = Buffer.concat(chunks).toString('utf8').trim();
   return body ? JSON.parse(body) : {};

@@ -20,6 +20,14 @@ export interface IngestBatchJob extends IngestBatchRequest {
   receivedAt: string;
 }
 
+export interface PrecheckSummary {
+  source: string;
+  totalReceived: number;
+  uniqueLinks: number;
+  duplicatesSkipped: number;
+  willDownload: number;
+}
+
 export interface ExistingMediaRecord {
   mediaId: string;
   sourceUrl: string;
