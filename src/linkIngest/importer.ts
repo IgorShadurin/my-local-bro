@@ -3,6 +3,7 @@ import type { AppConfig } from '../config.js';
 import { formatExecError, runShortsDownload } from '../downloader/shortsToProcess.js';
 import type { Logger } from '../logger.js';
 import type { TelegramClient } from '../telegram/client.js';
+import { TelegramStatusMessenger, type TelegramStatusHandle } from '../telegram/status.js';
 import { truncateText } from '../util/text.js';
 import { findExistingMediaRecords } from './db.js';
 import { normalizeLink, normalizeUrl, type NormalizedLink } from './normalize.js';
@@ -16,12 +17,15 @@ interface PreparedBatch {
 
 export class LinkBatchImporter {
   private activeAbort: AbortController | undefined;
+  private readonly status: TelegramStatusMessenger;
 
   constructor(
     private readonly telegram: TelegramClient,
     private readonly logger: Logger,
     private readonly config: Pick<AppConfig, 'telegram' | 'ytDownload'>,
-  ) {}
+  ) {
+    this.status = new TelegramStatusMessenger(telegram, logger);
+  }
 
   cancelCurrent(): boolean {
     if (!this.activeAbort) return false;
@@ -64,7 +68,7 @@ export class LinkBatchImporter {
       willProcess: prepared.queued.length,
     });
 
-    await this.notifyAll(this.startMessage(summary, prepared.queued.length));
+    const handles = await this.startProgress(summary, prepared.queued.length);
     try {
       for (const item of prepared.queued) {
         throwIfAborted(abort.signal);
@@ -82,6 +86,7 @@ export class LinkBatchImporter {
           summary.failed += 1;
           this.logger.error(`Batch download failed for ${item.normalizedUrl}`, error);
         }
+        await this.updateProgress(summary, prepared.queued.length, handles);
       }
       await this.notifyAll(this.finishMessage(summary));
     } catch (error) {
@@ -128,6 +133,8 @@ export class LinkBatchImporter {
       `Source: ${summary.source}`,
       `Will process ${willProcess} URLs.`,
       `Duplicates skipped: ${summary.duplicatesSkipped}`,
+      `Downloaded: ${summary.downloaded} of ${willProcess}`,
+      `Failed: ${summary.failed}`,
     ].join('\n');
   }
 
@@ -164,6 +171,29 @@ export class LinkBatchImporter {
   private async notifyAll(text: string): Promise<void> {
     for (const chatId of this.config.telegram.allowedUserIds) {
       await this.telegram.sendMessage({ chat_id: chatId, text });
+    }
+  }
+
+  private async startProgress(
+    summary: BatchImportSummary,
+    willProcess: number,
+  ): Promise<Map<number, TelegramStatusHandle>> {
+    const handles = new Map<number, TelegramStatusHandle>();
+    for (const chatId of this.config.telegram.allowedUserIds) {
+      const handle = await this.status.startStatus({ chatId }, this.startMessage(summary, willProcess));
+      handles.set(chatId, handle);
+    }
+    return handles;
+  }
+
+  private async updateProgress(
+    summary: BatchImportSummary,
+    willProcess: number,
+    handles: Map<number, TelegramStatusHandle>,
+  ): Promise<void> {
+    const text = this.startMessage(summary, willProcess);
+    for (const chatId of this.config.telegram.allowedUserIds) {
+      await this.status.updateStatus({ chatId }, handles.get(chatId), text);
     }
   }
 }

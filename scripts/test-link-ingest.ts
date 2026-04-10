@@ -39,7 +39,16 @@ async function testImporterDuplicateAndCancel(): Promise<void> {
   await chmod(scriptPath, 0o755);
 
   const sent: string[] = [];
-  const telegram = { sendMessage: async ({ text }: { text: string }) => { sent.push(text); return { message_id: sent.length } as never; } };
+  const telegram = {
+    sendMessage: async ({ text }: { text: string }) => {
+      sent.push(text);
+      return { message_id: sent.length } as never;
+    },
+    editMessageText: async ({ text }: { text: string }) => {
+      sent[sent.length - 1] = text;
+      return true as never;
+    },
+  };
   const importer = new LinkBatchImporter(telegram as never, new Logger(join(root, 'logs')), {
     telegram: { allowedUserIds: new Set([1]) } as never,
     ytDownload: { scriptPath, dbPath },
