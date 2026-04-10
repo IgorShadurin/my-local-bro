@@ -138,12 +138,14 @@ export class LinkBatchImporter {
   }
 
   private finishMessage(summary: BatchImportSummary): string {
-    return [
+    const lines = [
       '✅ Favorite links processed',
-      `Duplicates skipped: ${summary.duplicatesSkipped}`,
       `Downloaded: ${summary.downloaded}`,
-      `Failed: ${summary.failed}`,
-    ].join('\n');
+    ];
+    if (summary.failed > 0) {
+      lines.push(`Failed: ${summary.failed}`);
+    }
+    return lines.join('\n');
   }
 
   private cancelMessage(summary: BatchImportSummary): string {

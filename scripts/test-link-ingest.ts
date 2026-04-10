@@ -79,6 +79,8 @@ async function testImporterDuplicateAndCancel(): Promise<void> {
   if (!sent[0]?.includes('Will process 2 URLs.')) throw new Error(`Unexpected start message: ${sent[0]}`);
   if (!sent[0]?.includes('Duplicates skipped: 2')) throw new Error(`Unexpected duplicate count: ${sent[0]}`);
   if (!sent[1]?.includes('Downloaded: 2')) throw new Error(`Unexpected finish message: ${sent[1]}`);
+  if (sent[1]?.includes('Duplicates skipped:')) throw new Error(`Finish message should not repeat duplicates: ${sent[1]}`);
+  if (sent[1]?.includes('Failed: 0')) throw new Error(`Finish message should omit zero failed count: ${sent[1]}`);
 
   const cancelPromise = importer.runBatch({
     batchId: 'batch-2',
