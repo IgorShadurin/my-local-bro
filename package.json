@@ -1,0 +1,35 @@
+{
+  "name": "my-local-bro",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "webhook:start": "tsx src/webhook/server.ts",
+    "webhook:dev": "tsx watch src/webhook/server.ts",
+    "typecheck": "tsc --noEmit",
+    "pull:model": "ollama pull gemma4:e2b",
+    "benchmark:translation": "tsx scripts/benchmark-translation.ts",
+    "test:reminder": "tsx scripts/test-reminder-parsing.ts",
+    "test:web-search-multi": "tsx scripts/test-web-search-multi.ts",
+    "test:web-search-preprocess": "tsx scripts/test-web-search-preprocess.ts",
+    "test:human-research": "tsx scripts/test-human-research.ts",
+    "test:shorts-to-process": "tsx scripts/test-shorts-to-process.ts",
+    "test:link-ingest": "tsx scripts/test-link-ingest.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^17.4.1",
+    "ollama": "^0.6.3",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}
