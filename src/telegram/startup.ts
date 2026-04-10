@@ -16,7 +16,7 @@ export async function notifyOwnersServiceStarted(
   ].join('\n');
   for (const userId of config.telegram.allowedUserIds) {
     try {
-      await telegram.sendMessage({ chat_id: userId, text });
+      await telegram.sendMessage({ chat_id: userId, text, disable_notification: true });
       logger.success(`Startup notification sent to ${userId}`);
     } catch (error) {
       logger.warn(`Startup notification failed for ${userId}`, error);
