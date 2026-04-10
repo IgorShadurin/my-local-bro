@@ -27,12 +27,21 @@ export class TelegramStatusMessenger {
   }
 
   async startStatus(target: TelegramChatTarget, text: string): Promise<TelegramStatusHandle> {
+    return this.startStatusWithOptions(target, text, {});
+  }
+
+  async startStatusWithOptions(
+    target: TelegramChatTarget,
+    text: string,
+    options: { disableNotification?: boolean },
+  ): Promise<TelegramStatusHandle> {
     try {
       const result = await this.telegram.sendMessage({
         chat_id: target.chatId,
         text: telegramHtml(text),
         parse_mode: 'HTML',
         ...(target.messageThreadId ? { message_thread_id: target.messageThreadId } : {}),
+        ...(options.disableNotification ? { disable_notification: true } : {}),
       });
       return { messageId: result.message_id };
     } catch (error) {

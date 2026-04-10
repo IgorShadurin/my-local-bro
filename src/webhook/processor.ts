@@ -72,7 +72,11 @@ export class WebhookAudioProcessor {
       if (slots.length === 0) activeToolSlots.delete(name);
     };
 
-    const voiceStatus = await this.messenger.startStatus({ chatId }, '🎙️ Webhook audio received and will be transcribed');
+    const voiceStatus = await this.messenger.startStatusWithOptions(
+      { chatId },
+      '🎙️ Webhook audio received and will be transcribed',
+      { disableNotification: true },
+    );
     try {
       transcript = await this.transcriber.transcribeBuffer(event.audio, event.fileName);
       await this.messenger.finishStatus({ chatId }, voiceStatus, renderStatus(), false);

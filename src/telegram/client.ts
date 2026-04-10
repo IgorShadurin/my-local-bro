@@ -38,6 +38,7 @@ export class TelegramClient {
     parse_mode?: 'HTML';
     message_thread_id?: number;
     reply_markup?: TelegramInlineKeyboardMarkup;
+    disable_notification?: boolean;
   }): Promise<TelegramMessageResult> {
     return this.call<TelegramMessageResult>('sendMessage', params);
   }
