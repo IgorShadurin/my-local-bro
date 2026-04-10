@@ -130,7 +130,6 @@ export class LinkBatchImporter {
   private startMessage(summary: BatchImportSummary, willProcess: number): string {
     return [
       '📥 Favorite links received',
-      `Source: ${summary.source}`,
       `Will process ${willProcess} URLs.`,
       `Duplicates skipped: ${summary.duplicatesSkipped}`,
       `Downloaded: ${summary.downloaded} of ${willProcess}`,
@@ -141,7 +140,6 @@ export class LinkBatchImporter {
   private finishMessage(summary: BatchImportSummary): string {
     return [
       '✅ Favorite links processed',
-      `Source: ${summary.source}`,
       `Duplicates skipped: ${summary.duplicatesSkipped}`,
       `Downloaded: ${summary.downloaded}`,
       `Failed: ${summary.failed}`,
@@ -151,7 +149,6 @@ export class LinkBatchImporter {
   private cancelMessage(summary: BatchImportSummary): string {
     return [
       '⚠️ Favorite links processing cancelled',
-      `Source: ${summary.source}`,
       `Duplicates skipped: ${summary.duplicatesSkipped}`,
       `Downloaded before stop: ${summary.downloaded}`,
       `Failed before stop: ${summary.failed}`,
@@ -161,7 +158,6 @@ export class LinkBatchImporter {
   private failureMessage(summary: BatchImportSummary, error: unknown): string {
     return [
       '❌ Favorite links processing failed',
-      `Source: ${summary.source}`,
       `Downloaded before failure: ${summary.downloaded}`,
       `Failed before failure: ${summary.failed}`,
       truncateText(formatExecError(error), 500),

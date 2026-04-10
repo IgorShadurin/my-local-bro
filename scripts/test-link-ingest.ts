@@ -124,7 +124,7 @@ async function testLinkIngestServer(): Promise<void> {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        source: 'instagram_saved_posts',
+        source: 'saved_links_batch',
         links: [{ url: 'https://www.instagram.com/reel/ABC123/', platform: 'instagram', externalId: 'ABC123' }],
       }),
     });
@@ -137,7 +137,7 @@ async function testLinkIngestServer(): Promise<void> {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        source: 'instagram_saved_posts',
+        source: 'saved_links_batch',
         links: [{ url: 'https://www.instagram.com/reel/ABC123/', platform: 'instagram', externalId: 'ABC123' }],
       }),
     });
